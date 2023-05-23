@@ -7,6 +7,13 @@ color matching and brute forcing best combinations and rotations
 
 ## Installation
 
+Clone repo
+
+```
+git clone https://github.com/AlexanderLJX/Tetrio-bot.git
+cd Tetrio-bot
+```
+
 Download and install Anaconda from [anaconda.com/download](https://www.anaconda.com/download/) and add it to your environment path.
 
 ```
@@ -26,7 +33,7 @@ python test.py
 
 2. Set the coordinates of first and second block while waiting for the countdown in tetrio
 
-[image](Capture.PNG)
+![image](Capture.PNG)
 
 - Hover your mouse over the middle of the first block and press `[`
 - Hover your cursor over the middle of the second block and press `]`
