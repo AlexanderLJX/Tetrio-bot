@@ -1,11 +1,9 @@
 import keyboard
 import mouse
 import pyautogui
-from colormath.color_objects import sRGBColor, LabColor
-from colormath.color_conversions import convert_color
-from colormath.color_diff import delta_e_cie2000
 import time
 import numpy as np
+import math
 from PIL import ImageGrab
 from TetrisBoard import TetrisBoard
 
@@ -174,6 +172,9 @@ def place_block(board, rotated_block, position):
     new_board[position[0]:position[0] + rotated_block.shape[0], position[1]:position[1] + rotated_block.shape[1]] += rotated_block
     return new_board
 
+def euclidean_distance(color1, color2):
+    return math.sqrt(sum((a - b) ** 2 for a, b in zip(color1, color2)))
+
 def closest_color_in_area(colors, x, y):
     # get pixel colors in a 10 by 10 around x and y
     target_colors = []
@@ -189,7 +190,7 @@ def closest_color_in_area(colors, x, y):
     min_diff = float('inf')
     for target_color in target_colors:
         for color in colors:
-            diff = delta_e_cie2000(convert_color(sRGBColor(*color), LabColor), convert_color(sRGBColor(*target_color), LabColor))
+            diff = euclidean_distance(color, target_color)
             if diff < min_diff:
                 min_diff = diff
                 closest_color = color
@@ -319,40 +320,7 @@ while True:
                 for row in reversed(tetrisboard.board):
                     print(row)
                 print("")
-
-
-    # Get the pixel color and find the closest color with the "=" key
-    if keyboard.is_pressed('='):
-        pixel_color1 = get_pixel_color(x1, y1)
-        pixel_color2 = get_pixel_color(x2, y2)
-        matched_color1 = closest_color(pixel_color1, colors)
-        matched_color2 = closest_color(pixel_color2, colors)
-        print(f'Pixel color: {pixel_color1}, Closest color: {matched_color1}')
-        piece_array = [get_piece_based_on_color(matched_color1), get_piece_based_on_color(matched_color2), get_piece_based_on_color(matched_color3)]
-        
-        best_position, best_rotation = find_best_position(tetrisboard.board, piece_array)
-        best_piece_pos_rot = piece_array[0][best_rotation]
-        # remove first piece from piece_array
-        piece_array.pop(0)
-        # remove 0s padding
-        best_piece_pos_rot = best_piece_pos_rot[~np.all(best_piece_pos_rot == 0, axis=1)]
-        best_piece_pos_rot = best_piece_pos_rot[:, ~np.all(best_piece_pos_rot == 0, axis=0)]
-        tetrisboard.add_piece(piece_array[0][best_rotation], best_position)
-        # clear full rows
-        tetrisboard.clear_full_rows()
-        # press up arrow to rotate for rotation
-        for i in range(best_rotation):
-            pyautogui.press('up')
-        # press left arrow or right arrow to move to position
-        if best_position[1] < 5:
-            for i in range(5 - best_position[1]):
-                pyautogui.press('right')
-        elif best_position[1] > 5:
-            for i in range(best_position[1] - 5):
-                pyautogui.press('left')
-        # print the board
-        print(tetrisboard.board)
-
+                
     # Exit the loop with the "ESC" key
     if keyboard.is_pressed('esc'):
         break
