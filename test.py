@@ -9,6 +9,11 @@ import numpy as np
 from PIL import ImageGrab
 from TetrisBoard import TetrisBoard
 
+# patch colormath
+def patch_asscalar(a):
+    return a.item()
+setattr(np, "asscalar", patch_asscalar)
+
 
 # Each piece is represented by a 2D array, and rotations are stored as a list of 2D arrays
 # 4x4 pieces are padded with 0s to make them 4x4
@@ -174,35 +179,6 @@ def place_block(board, rotated_block, position):
     rotated_block = rotated_block[:, ~np.all(rotated_block == 0, axis=0)]
     new_board[position[0]:position[0] + rotated_block.shape[0], position[1]:position[1] + rotated_block.shape[1]] += rotated_block
     return new_board
-
-# def get_pixel_colors(x, y):
-#     # get pixel colors in a 10 by 10 around x and y
-#     colors = []
-#     # Grab a portion of the screen
-#     image = ImageGrab.grab(bbox=(x - 5, y - 5, x + 5, y + 5))
-#     # Loop through the pixels in the grabbed image
-#     for i in range(10):
-#         for j in range(10):
-#             colors.append(image.getpixel((i, j)))
-#     return colors
-
-# def closest_color(pixel, colors):
-#     pixel_rgb = sRGBColor(*pixel)
-#     pixel_lab = convert_color(pixel_rgb, LabColor)
-
-#     min_diff = float('inf')
-#     closest_color = None
-
-#     for color in colors:
-#         color_rgb = sRGBColor(*color)
-#         color_lab = convert_color(color_rgb, LabColor)
-#         diff = delta_e_cie2000(pixel_lab, color_lab)
-
-#         if diff < min_diff:
-#             min_diff = diff
-#             closest_color = color
-
-#     return closest_color
 
 def closest_color_in_area(colors, x, y):
     # get pixel colors in a 10 by 10 around x and y
@@ -386,30 +362,3 @@ while True:
     # Exit the loop with the "ESC" key
     if keyboard.is_pressed('esc'):
         break
-
-
-
-# # np.random.seed(1)
-# # get 4 random pieces
-# piece_array = []
-# for i in range(4):
-#     piece_array.append(tetris_pieces[list(tetris_pieces.keys())[np.random.randint(0, len(tetris_pieces))]])
-# for i in range(200):
-#     # random piece
-#     # get random piece and append it to piece_array
-#     piece_array.append(tetris_pieces[list(tetris_pieces.keys())[np.random.randint(0, len(tetris_pieces))]])
-#     # print(list(tetris_pieces.values()))
-#     best_position, best_rotation =  find_best_position(tetrisboard.board, piece_array)
-#     best_piece_pos_rot = piece_array[0][best_rotation]
-#     # remove first piece from piece_array
-#     piece_array.pop(0)
-#     # remove 0s padding
-#     best_piece_pos_rot = best_piece_pos_rot[~np.all(best_piece_pos_rot == 0, axis=1)]
-#     best_piece_pos_rot = best_piece_pos_rot[:, ~np.all(best_piece_pos_rot == 0, axis=0)]
-#     tetrisboard.add_piece(best_piece_pos_rot, best_position)
-#     # clear full rows
-#     tetrisboard.clear_full_rows()
-#     # print the board
-#     for row in reversed(tetrisboard.board):
-#         print(row)
-#     print("")
