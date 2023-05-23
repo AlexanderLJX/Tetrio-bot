@@ -9,12 +9,6 @@ import numpy as np
 from PIL import ImageGrab
 from TetrisBoard import TetrisBoard
 
-# patch colormath
-def patch_asscalar(a):
-    return a.item()
-setattr(np, "asscalar", patch_asscalar)
-
-
 # Each piece is represented by a 2D array, and rotations are stored as a list of 2D arrays
 # 4x4 pieces are padded with 0s to make them 4x4
 tetris_pieces = {
