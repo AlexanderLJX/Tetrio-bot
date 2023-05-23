@@ -1,0 +1,6 @@
+colormath==3.0.0
+keyboard==0.13.5
+mouse==0.7.1
+numpy==1.24.3
+Pillow==9.5.0
+PyAutoGUI==0.9.53
