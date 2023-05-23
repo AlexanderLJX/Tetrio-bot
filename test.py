@@ -6,6 +6,7 @@ from colormath.color_conversions import convert_color
 from colormath.color_diff import delta_e_cie2000
 import time
 import numpy as np
+from PIL import ImageGrab
 from TetrisBoard import TetrisBoard
 
 
@@ -14,7 +15,7 @@ from TetrisBoard import TetrisBoard
 tetris_pieces = {
     'I': [
         np.array([[1, 1, 1, 1]]),
-        np.array([[0, 1, 0, 0], [0, 1, 0, 0], [0, 1, 0, 0], [0, 1, 0, 0]])
+        np.array([[0, 0, 1, 0], [0, 0, 1, 0], [0, 0, 1, 0], [0, 0, 1, 0]])
     ],
     'O': [
         np.array([[0, 1, 1, 0], [0, 1, 1, 0]])
@@ -29,13 +30,13 @@ tetris_pieces = {
         np.array([[1, 1, 1, 0], [0, 0, 1, 0]]),
         np.array([[0, 1, 1, 0], [0, 1, 0, 0], [0, 1, 0, 0]]),
         np.array([[1, 0, 0, 0], [1, 1, 1, 0]]),
-        np.array([[0, 1, 0, 0], [0, 1, 0, 0], [0, 1, 0, 0], [0, 1, 1, 0]]),
+        np.array([[1, 0, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0], [1, 1, 0, 0]]),
     ],
     'L2': [
         np.array([[1, 1, 1, 0], [1, 0, 0, 0]]),
         np.array([[0, 1, 0, 0], [0, 1, 0, 0], [0, 1, 1, 0]]),
         np.array([[0, 0, 1, 0], [1, 1, 1, 0]]),
-        np.array([[0, 1, 0, 0], [0, 1, 0, 0], [0, 1, 1, 0]]),
+        np.array([[1, 0, 0, 0], [1, 0, 0, 0], [1, 1, 0, 0]]),
     ],
     'Z': [
         np.array([[0, 1, 1, 0], [1, 1, 0, 0]]),
@@ -113,14 +114,15 @@ def get_positions(board, rotated_block):
     return possible_positions
 
 def clear_full_rows(board):
-    full_rows = []
-    for y, row in enumerate(board):
-        if all(cell == 1 for cell in row):
-            full_rows.append(y)
-    for row in full_rows:
-        board = np.delete(board, row, axis=0)
-        board = np.insert(board, board.shape[0], 0, axis=0)
-    return board
+    while True:
+        for y, row in enumerate(board):
+            if all(cell == 1 for cell in row):
+                board = np.delete(board, y, axis=0)
+                # insert new row at last index which is the top of the board
+                board = np.insert(board, board.shape[0], 0, axis=0)
+                break
+            if y == board.shape[0] - 1:
+                return board
 
 def find_least_holes(board):
     return np.sum((board == 0) & (np.cumsum(board, axis=0) < np.sum(board, axis=0)))
@@ -173,50 +175,81 @@ def place_block(board, rotated_block, position):
     new_board[position[0]:position[0] + rotated_block.shape[0], position[1]:position[1] + rotated_block.shape[1]] += rotated_block
     return new_board
 
-def get_pixel_color(x, y):
-    print(f'Getting pixel color at ({x}, {y})')
-    color = pyautogui.pixel(x, y)
-    return color
+# def get_pixel_colors(x, y):
+#     # get pixel colors in a 10 by 10 around x and y
+#     colors = []
+#     # Grab a portion of the screen
+#     image = ImageGrab.grab(bbox=(x - 5, y - 5, x + 5, y + 5))
+#     # Loop through the pixels in the grabbed image
+#     for i in range(10):
+#         for j in range(10):
+#             colors.append(image.getpixel((i, j)))
+#     return colors
 
-def closest_color(pixel, colors):
-    pixel_rgb = sRGBColor(*pixel)
-    pixel_lab = convert_color(pixel_rgb, LabColor)
+# def closest_color(pixel, colors):
+#     pixel_rgb = sRGBColor(*pixel)
+#     pixel_lab = convert_color(pixel_rgb, LabColor)
 
+#     min_diff = float('inf')
+#     closest_color = None
+
+#     for color in colors:
+#         color_rgb = sRGBColor(*color)
+#         color_lab = convert_color(color_rgb, LabColor)
+#         diff = delta_e_cie2000(pixel_lab, color_lab)
+
+#         if diff < min_diff:
+#             min_diff = diff
+#             closest_color = color
+
+#     return closest_color
+
+def closest_color_in_area(colors, x, y):
+    # get pixel colors in a 10 by 10 around x and y
+    target_colors = []
+    # Grab a portion of the screen
+    image = ImageGrab.grab(bbox=(x - 3, y - 3, x + 3, y + 3))
+    # Loop through the pixels in the grabbed image
+    for i in range(6):
+        for j in range(6):
+            target_colors.append(image.getpixel((i, j)))
+
+    # find the closest color in target_colors that is in colors
+    closest_color = (0, 0, 0)
     min_diff = float('inf')
-    closest_color = None
+    for target_color in target_colors:
+        for color in colors:
+            diff = delta_e_cie2000(convert_color(sRGBColor(*color), LabColor), convert_color(sRGBColor(*target_color), LabColor))
+            if diff < min_diff:
+                min_diff = diff
+                closest_color = color
+            if min_diff == 0:
+                break
+    print("min diff: ", min_diff)
+    print("closest color: ", closest_color)
+    return tuple(closest_color)
 
-    for color in colors:
-        color_rgb = sRGBColor(*color)
-        color_lab = convert_color(color_rgb, LabColor)
-        diff = delta_e_cie2000(pixel_lab, color_lab)
-
-        if diff < min_diff:
-            min_diff = diff
-            closest_color = color
-
-    return closest_color
-
-def get_piece_based_on_color(matched_color):
+def get_piece_based_on_color(matched_color, colors):
     piece = None
-    if matched_color == (255, 0, 0):
+    if matched_color == colors[0]:
         print('Red - Z')
         piece = tetris_pieces['Z']
-    elif matched_color == (0, 255, 0):
+    elif matched_color == colors[1]:
         print('Lime - Z2')
         piece = tetris_pieces['Z2']
-    elif matched_color == (72, 61, 139):
+    elif matched_color == colors[2]:
         print('Dark blue - L2')
         piece = tetris_pieces['L2']
-    elif matched_color == (255, 255, 0):
+    elif matched_color == colors[3]:
         print('Yellow - O')
         piece = tetris_pieces['O']
-    elif matched_color == (64, 224, 204):
+    elif matched_color == colors[4]:
         print('Turquoise - I')
         piece = tetris_pieces['I']
-    elif matched_color == (255, 165, 0):
+    elif matched_color == colors[5]:
         print('Orange - L')
         piece = tetris_pieces['L']
-    elif matched_color == (218, 112, 214):
+    elif matched_color == colors[6]:
         print('Purple - T')
         piece = tetris_pieces['T']
     if piece is None:
@@ -225,13 +258,13 @@ def get_piece_based_on_color(matched_color):
 
 # Define your 7 colors
 colors = [
-    (255, 0, 0),  # red 
-    (0, 255, 0),  # lime
-    (72, 61, 139), # dark blue
-    (255, 255, 0),  # yellow
-    (64, 224, 204),  # turquoise
-    (255, 165, 0), # orange
-    (218, 112, 214), # purple
+    (194, 64, 70),  # red 
+    (142, 191, 61),  # lime
+    (93, 76, 176), # dark blue
+    (192, 168, 64),  # yellow
+    (62, 191, 144),  # turquoise
+    (194, 115, 68), # orange
+    (176, 75, 166), # purple
 ]
 
 x1, y1 = 0, 0
@@ -244,63 +277,71 @@ piece_array = []
 while True:
     if keyboard.is_pressed('['):
         x1, y1 = mouse.get_position()
-        print(f'Coordinates set to ({x1}, {y1})')
+        time.sleep(0.2)
 
     if keyboard.is_pressed(']'):
         x2, y2 = mouse.get_position()
-        print(f'Coordinates set to ({x2}, {y2})')
+        time.sleep(0.2)
 
     if x1 != 0 and x2 != 0 and not board_initialized:
         print('Board initialized')
         board_initialized = True
-        pixel_color1 = get_pixel_color(x1, y1)
-        pixel_color2 = get_pixel_color(x2, y2)
-        closest_color1 = closest_color(pixel_color1, colors)
-        closest_color2 = closest_color(pixel_color2, colors)
-        piece_array.append(get_piece_based_on_color(closest_color1))
-        piece_array.append(get_piece_based_on_color(closest_color2))
+        closest_color1 = closest_color_in_area(colors, x1, y1)
+        closest_color2 = closest_color_in_area(colors, x2, y2)
+        print(f'Closest color: {closest_color1}')
+        print(f'Closest color: {closest_color2}')
+        piece_array.append(get_piece_based_on_color(closest_color1, colors))
+        piece_array.append(get_piece_based_on_color(closest_color2, colors))
         while True:
             # set break key
             if keyboard.is_pressed('esc'):
                 break
-            # if coord at x1, y1 change color, add piece to piece_array
-            if closest_color2 != closest_color(get_pixel_color(x2, y2), colors):
-                pixel_color2 = get_pixel_color(x2, y2)
-                closest_color2 = closest_color(pixel_color2, colors)
-                piece_array.append(get_piece_based_on_color(closest_color2))
+            # if coord at x1, y1 change color, add piece to piece_ar ray
+            closest_color1_0 = closest_color_in_area(colors, x1, y1)
+            closest_color2_0 = closest_color_in_area(colors, x2, y2)
+            if closest_color2 != closest_color2_0 or closest_color1 != closest_color1_0:
+                closest_color2 = closest_color2_0
+                closest_color1 = closest_color1_0
+                piece_array.append(get_piece_based_on_color(closest_color2, colors))
                 # place down the piece in the first array
                 best_position, best_rotation = find_best_position(tetrisboard.board, piece_array)
                 best_piece_pos_rot = piece_array[0][best_rotation]
+                print("current piece: ")
+                for row in reversed(best_piece_pos_rot):
+                    print(row)
                 # remove first piece from piece_array
                 piece_array.pop(0)
-                # remove 0s padding
-                best_piece_pos_rot = best_piece_pos_rot[~np.all(best_piece_pos_rot == 0, axis=1)]
-                best_piece_pos_rot = best_piece_pos_rot[:, ~np.all(best_piece_pos_rot == 0, axis=0)]
-                # add offset depending on padded zeros on the left side of axis 0 only
+                # add offset depending on padded zeros on the left side of axis 1 only
                 offset = 0
-                for i in range(best_piece_pos_rot.shape[0]):
-                    if np.all(best_piece_pos_rot[i] == 0):
+                for i in range(best_piece_pos_rot.shape[1]):
+                    if not any(best_piece_pos_rot[:, i]):
                         offset += 1
                     else:
                         break
-                best_position += offset
+                print("offset: ", offset)
+                print("best position: ", best_position)
+                best_position2 = (best_position[0], best_position[1] - offset)
+                print("best position: ", best_position2)
                 # if coord at x2, y2 change color, add piece to piece_array
                 # press up arrow to rotate for rotation
                 for i in range(best_rotation):
                     pyautogui.press('up')
-                    time.sleep(0.1)
+                    time.sleep(0.2)
                 # press left arrow or right arrow to move to position
-                if best_position[1] < 3:
-                    for i in range(3 - best_position[1]):
+                if best_position2[1] < 3:
+                    for i in range(3 - best_position2[1]):
                         pyautogui.press('left')
-                        time.sleep(0.1)
-                elif best_position[1] > 3:
-                    for i in range(best_position[1] - 3):
+                        time.sleep(0.2)
+                elif best_position2[1] > 3:
+                    for i in range(best_position2[1] - 3):
                         pyautogui.press('right')
-                        time.sleep(0.1)
+                        time.sleep(0.2)
                 # press space to drop piece
                 pyautogui.press('space')
-                time.sleep(0.3)
+                time.sleep(0.2)
+                # remove 0s padding
+                best_piece_pos_rot = best_piece_pos_rot[~np.all(best_piece_pos_rot == 0, axis=1)]
+                best_piece_pos_rot = best_piece_pos_rot[:, ~np.all(best_piece_pos_rot == 0, axis=0)]
                 tetrisboard.add_piece(best_piece_pos_rot, best_position)
                 # clear full rows
                 tetrisboard.clear_full_rows()
