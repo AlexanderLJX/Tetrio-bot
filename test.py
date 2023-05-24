@@ -6,26 +6,19 @@ from PIL import ImageGrab
 from TetrisBoard import TetrisBoard
 import pyautogui # somehow the mouse get_position doesn't work
 
-# x1_board, y1_board = 1342, 396 # top left of board
-# x2_board, y2_board = 1512, 733 # bottom right of board
-# x1, y1 = 1566, 439
-# x2, y2 = 0, 0
-# x3, y3 = 0, 0
-# x4, y4 = 0, 0
-# x5, y5 = 1564, 643
-
-x1_board, y1_board = 1100,228 # top left of board
-x2_board, y2_board = 1399,827 # bottom right of board
-x1, y1 = 1475,289
+x1_board, y1_board = 1341,375 # top left of board
+x2_board, y2_board = 1512,715 # bottom right of board
+x1, y1 = 1564,418
 x2, y2 = 0, 0
 x3, y3 = 0, 0
 x4, y4 = 0, 0
-x5, y5 = 1475,649
+x5, y5 = 1565,622
 
-pixel_area = 30 # number of pixels to check for color - auto set
+
+pixel_area = 30 # number of pixels to check for color - auto
 
 # keybinds
-rotate_clockwise_key = 'up'
+rotate_clockwise_key = 'x' # for some reason this is the only key that works - 'up' doesn't work
 rotate_180_key = 'a'
 rotate_counterclockwise_key = 'z'
 move_left_key = 'left'
@@ -53,7 +46,15 @@ colors = [
     (176, 75, 166), # purple - T
 ]
 
+# jstris settings
 if jstris:
+    # keybinds
+    rotate_clockwise_key = 'up'
+    rotate_180_key = 'a'
+    rotate_counterclockwise_key = 'z'
+    move_left_key = 'left'
+    move_right_key = 'right'
+    drop_key = 'space'
     # colors for jstris
     colors = [
         (215, 15, 55),  # red - Z
@@ -64,6 +65,14 @@ if jstris:
         (227, 91, 2), # orange - L
         (175, 41, 138), # purple - T
     ]
+
+    x1_board, y1_board = 1100,228 # top left of board
+    x2_board, y2_board = 1399,827 # bottom right of board
+    x1, y1 = 1475,289
+    x2, y2 = 0, 0
+    x3, y3 = 0, 0
+    x4, y4 = 0, 0
+    x5, y5 = 1475,649
 
 # Each piece is represented by a 2D array, and rotations are stored as a list of 2D arrays
 # 4x4 pieces are padded with 0s to make them 4x4
@@ -315,6 +324,7 @@ piece_array = []
 
 def key_press(best_position, best_rotation):
     # rotate
+    print("best rotation: " + str(best_rotation))
     if best_rotation == 1:
         keyboard.press(rotate_clockwise_key)
         keyboard.release(rotate_clockwise_key)
@@ -347,7 +357,7 @@ def key_press(best_position, best_rotation):
     keyboard.press('space')
     keyboard.release('space')
     if key_delay > 0:
-            time.sleep(key_delay)
+        time.sleep(key_delay)
 
 
 def get_tetris_board_from_screen(top_left_x, top_left_y, bottom_right_x, bottom_right_y):
@@ -462,6 +472,8 @@ while True:
                 start_time2 = time.time()
                 # get board from screen
                 tetrisboard.board = get_tetris_board_from_screen(x1_board, y1_board, x2_board, y2_board)
+                for row in reversed(tetrisboard.board):
+                    print(row)
                 print("time for get board: ", time.time() - start_time2)
             # time how long find_best_position takes
             start_time2 = time.time()
