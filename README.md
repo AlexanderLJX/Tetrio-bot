@@ -37,5 +37,12 @@ python test.py
 
 - Hover your mouse over the middle of the first block and press `[`
 - Hover your cursor over the middle of the second block and press `]`
+- Press spacebar to start
 
+## Tetrio settings
+- ARR 0ms
+- DAS 40ms
+- Set Graphics Minimal for optimum performance
+- Default Guideline Controls
+- Make sure tetris pieces are default color
 
