@@ -1,33 +1,69 @@
 import keyboard
-import mouse
 import time
 import numpy as np
 import math
 from PIL import ImageGrab
 from TetrisBoard import TetrisBoard
+import pyautogui # somehow the mouse get_position doesn't work
 
-# set x1, y1, x2, y2
-x1, y1 = 1566, 439
+# x1_board, y1_board = 1342, 396 # top left of board
+# x2_board, y2_board = 1512, 733 # bottom right of board
+# x1, y1 = 1566, 439
+# x2, y2 = 0, 0
+# x3, y3 = 0, 0
+# x4, y4 = 0, 0
+# x5, y5 = 1564, 643
+
+x1_board, y1_board = 1100,228 # top left of board
+x2_board, y2_board = 1399,827 # bottom right of board
+x1, y1 = 1475,289
 x2, y2 = 0, 0
 x3, y3 = 0, 0
 x4, y4 = 0, 0
-x5, y5 = 1564, 643
+x5, y5 = 1475,649
 
-x1_board, y1_board = 1342, 396 # top left of board
-x2_board, y2_board = 1512, 733 # bottom right of board
+pixel_area = 30 # number of pixels to check for color - auto set
 
 # keybinds
-rotate_clockwise_key = 'x'
+rotate_clockwise_key = 'up'
 rotate_180_key = 'a'
 rotate_counterclockwise_key = 'z'
 move_left_key = 'left'
 move_right_key = 'right'
 drop_key = 'space'
 # constants - ARR 0ms - DAS 40ms
-calculation_accuracy = 5 # number of boards to keep at each depth - higher number means more accurate but slower
-max_depth = 6 # number of moves into the future to simulate - higher number means more accurate but slower
+calculation_accuracy = 5 # number of best moves to keep at each depth - higher number means more accurate but slower
+max_depth = 6 # number of moves into the future to simulate, max is 6, you can only see 6 blocks at once - higher number means more accurate but slower
 wait_time = 0.04 # time to wait, can't go too low because you need to wait for screen to refresh
 scan_board = True # some modes require scanning the board because of extra pieces - zen, multiplayer
+jstris = False # jstris mode - changes colors
+
+# Game Settings - DAS 40ms, ARR 0ms
+
+key_delay = 0
+
+# Colors for tetrio
+colors = [
+    (194, 64, 70),  # red - Z
+    (142, 191, 61),  # lime - Z2
+    (93, 76, 176), # dark blue - L2
+    (192, 168, 64),  # yellow - O
+    (62, 191, 144),  # turquoise - I
+    (194, 115, 68), # orange - L
+    (176, 75, 166), # purple - T
+]
+
+if jstris:
+    # colors for jstris
+    colors = [
+        (215, 15, 55),  # red - Z
+        (89, 177, 1),  # lime - Z2
+        (33, 65, 198), # dark blue - L2
+        (227, 159, 2),  # yellow - O
+        (15, 155, 215),  # turquoise - I
+        (227, 91, 2), # orange - L
+        (175, 41, 138), # purple - T
+    ]
 
 # Each piece is represented by a 2D array, and rotations are stored as a list of 2D arrays
 # 4x4 pieces are padded with 0s to make them 4x4
@@ -223,10 +259,12 @@ def closest_color_in_area(colors, x, y):
         # get pixel colors in a 10 by 10 around x and y
         target_colors = []
         # Grab a portion of the screen
-        image = ImageGrab.grab(bbox=(x - 5, y - 5, x + 5, y + 5))
+        half = pixel_area//2
+        full = half * 2
+        image = ImageGrab.grab(bbox=(x - half, y - half, x + half, y + half))
         # Loop through the pixels in the grabbed image
-        for i in range(10):
-            for j in range(10):
+        for i in range(full):
+            for j in range(full):
                 target_colors.append(image.getpixel((i, j)))
 
         # find the closest color in target_colors that is in colors
@@ -269,17 +307,6 @@ def get_piece_based_on_color(matched_color, colors):
         print('No piece found')
     return piece
 
-# Define your 7 colors
-colors = [
-    (194, 64, 70),  # red 
-    (142, 191, 61),  # lime
-    (93, 76, 176), # dark blue
-    (192, 168, 64),  # yellow
-    (62, 191, 144),  # turquoise
-    (194, 115, 68), # orange
-    (176, 75, 166), # purple
-]
-
 
 # Create a new board
 tetrisboard = TetrisBoard()
@@ -291,24 +318,36 @@ def key_press(best_position, best_rotation):
     if best_rotation == 1:
         keyboard.press(rotate_clockwise_key)
         keyboard.release(rotate_clockwise_key)
+        if key_delay > 0:
+            time.sleep(key_delay)
     elif best_rotation == 2:
         keyboard.press(rotate_180_key)
         keyboard.release(rotate_180_key)
+        if key_delay > 0:
+            time.sleep(key_delay)
     elif best_rotation == 3:
         keyboard.press(rotate_counterclockwise_key)
         keyboard.release(rotate_counterclockwise_key)
+        if key_delay > 0:
+            time.sleep(key_delay)
     # press left arrow or right arrow to move to position
     if best_position[1] < 3:
         for i in range(3 - best_position[1]):
             keyboard.press(move_left_key)
             keyboard.release(move_left_key)
+            if key_delay > 0:
+                time.sleep(key_delay)
     elif best_position[1] > 3:
         for i in range(best_position[1] - 3):
             keyboard.press(move_right_key)
             keyboard.release(move_right_key)
+            if key_delay > 0:
+                time.sleep(key_delay)
     # press space to drop piece
     keyboard.press('space')
     keyboard.release('space')
+    if key_delay > 0:
+            time.sleep(key_delay)
 
 
 def get_tetris_board_from_screen(top_left_x, top_left_y, bottom_right_x, bottom_right_y):
@@ -347,24 +386,35 @@ def get_tetris_board_from_screen(top_left_x, top_left_y, bottom_right_x, bottom_
 # start program
 while True:
     if keyboard.is_pressed('['):
-        x1, y1 = mouse.get_position()
+        x1, y1 = pyautogui.position()
+        print(f"first piece: {x1},{y1}")
         time.sleep(0.2)
 
     if keyboard.is_pressed(']'):
-        x5, y5 = mouse.get_position()
+        x5, y5 = pyautogui.position()
+        print(f"fifth piece: {x5},{y5}")
         time.sleep(0.2)
     
     if keyboard.is_pressed('-'):
-        x1_board, y1_board = mouse.get_position()
+        x1_board, y1_board = pyautogui.position()
+        print(f"top left: {x1_board},{y1_board}")
         time.sleep(0.2)
 
     if keyboard.is_pressed('='):
-        x2_board, y2_board = mouse.get_position()
+        x2_board, y2_board = pyautogui.position()
+        print(f"bottom right: {x2_board},{y2_board}")
         time.sleep(0.2)
+
+    # Exit the loop with the "ESC" key
+    if keyboard.is_pressed('esc'):
+        break
 
     if x1 != 0 and x5 != 0 and not board_initialized and keyboard.is_pressed('space'):
         print('Board initialized')
         board_initialized = True
+        # calculate pixel_area
+        pixel_area = (y5 - y1)//10
+        print("pixel_area: ", pixel_area)
         x2, y2 = (x1+x5)//2, y1+math.floor(((y5-y1)/4)*1)
         x3, y3 = (x1+x5)//2, y1+math.floor(((y5-y1)/4)*2)
         x4, y4 = (x1+x5)//2, y1+math.floor(((y5-y1)/4)*3)
@@ -387,6 +437,10 @@ while True:
         while True:
             # set break key
             if keyboard.is_pressed('esc'):
+                break
+            # restart
+            if keyboard.is_pressed(';'):
+                board_initialized = False
                 break
             # lock until piece changes
             if first_move:
@@ -436,7 +490,3 @@ while True:
             tetrisboard.clear_full_rows()
             time.sleep(wait_time) # this is needed for some reason (maybe wait for screen to refresh), probably can find a better way
             print("total time: ", time.time() - start_time)
-                
-    # Exit the loop with the "ESC" key
-    if keyboard.is_pressed('esc'):
-        break

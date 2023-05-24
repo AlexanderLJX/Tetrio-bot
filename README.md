@@ -1,5 +1,6 @@
 # Tetrio-bot
-color matching and brute forcing best combinations and rotations
+
+color matching and brute forcing best combinations and rotations for any tetris game tetr.io/jstris (change color in python file)
 
 ## Demo
 
@@ -45,6 +46,8 @@ python test.py
 
 *Alternatively you can set the coordinates directly in the script, other settings are also in the script
 
+Configure additional settings directly in the script
+
 ## Tetrio settings
 - ARR 0ms
 - DAS 40ms
@@ -57,3 +60,8 @@ python test.py
 Using the bot may get your IP and Account banned, advised not to break the world record.
 
 ![Capture](https://github.com/AlexanderLJX/Tetrio-bot/assets/83382087/8ea50bc0-ffd8-49b6-8a26-23fe7e1b21f1)
+
+
+## To-do
+- T-spins
+- cython version
