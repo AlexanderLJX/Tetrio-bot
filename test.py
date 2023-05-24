@@ -5,22 +5,29 @@ import numpy as np
 import math
 from PIL import ImageGrab
 from TetrisBoard import TetrisBoard
-import pyautogui
 
 # set x1, y1, x2, y2
 x1, y1 = 1566, 439
-x2, y2 = 1564, 488
+x2, y2 = 0, 0
+x3, y3 = 0, 0
+x4, y4 = 0, 0
+x5, y5 = 1564, 643
 
 x1_board, y1_board = 1342, 396 # top left of board
 x2_board, y2_board = 1512, 733 # bottom right of board
 
 # keybinds
-rotate_clockwise = 'x'
-rotate_180 = 'a'
-rotate_counterclockwise = 'z'
+rotate_clockwise_key = 'x'
+rotate_180_key = 'a'
+rotate_counterclockwise_key = 'z'
+move_left_key = 'left'
+move_right_key = 'right'
+drop_key = 'space'
 # constants - ARR 0ms - DAS 40ms
-calculation_accuracy = 10 # higher number means more accurate but slower
-multiplayer = True # multiplayer mode has the pieces spawning from the bottom
+calculation_accuracy = 5 # number of boards to keep at each depth - higher number means more accurate but slower
+max_depth = 6 # number of moves into the future to simulate - higher number means more accurate but slower
+wait_time = 0.04 # time to wait, can't go too low because you need to wait for screen to refresh
+scan_board = True # some modes require scanning the board because of extra pieces - zen, multiplayer
 
 # Each piece is represented by a 2D array, and rotations are stored as a list of 2D arrays
 # 4x4 pieces are padded with 0s to make them 4x4
@@ -79,7 +86,6 @@ def evaluate_board(board):
     num_cleared_rows = np.sum(np.all(board == 1, axis=1))
     # The number of holes - find number of 0s with 1s above
     holes = np.sum((board == 0) & (np.cumsum(board, axis=0) < np.sum(board, axis=0)))
-    # print("holes: ", holes)
     # The number of blockades - find number of 1s with 0s above
     blockades = np.sum((board == 1) & (np.cumsum(board, axis=0) > 0))
     # assign higher weights to higher blocks
@@ -88,11 +94,14 @@ def evaluate_board(board):
         for row in reversed(range(board.shape[0])):
             # find highest block in each column
             if board[row][col] == 1:
-                weighted_heights += (row + 1) * (row + 1)
+                if row > 5:
+                    weighted_heights += (row + 1) * (row + 1 - 5)
+                else:
+                    weighted_heights += (row + 1)
                 break
 
-    A, B, C, D, E = -1, 10, -20, -1, -1
-    score = A * weighted_heights + B * num_cleared_rows + C * holes + D * blockades + E * highest_block_row
+    A, B, C, D, E = -1, 10, -50, -1, -1
+    score = A * weighted_heights + B * num_cleared_rows * num_cleared_rows * num_cleared_rows + C * holes + D * blockades + E * highest_block_row
     return score
 
 def get_positions(board, rotated_block):
@@ -106,8 +115,9 @@ def get_positions(board, rotated_block):
         y = board.shape[0] - rotated_block.shape[0] - 1
         while y >= 0:
             if np.any(np.logical_and(rotated_block, board[y:y + rotated_block.shape[0], x:x + rotated_block.shape[1]])):
-                if y == board.shape[0] - rotated_block.shape[0] - 1:
+                if y > board.shape[0] - rotated_block.shape[0]:
                     print("You lose!")
+                    break
                     # exit()
                 possible_positions.append((y + 1, x))
                 break
@@ -127,72 +137,70 @@ def clear_full_rows(board):
                 break
             if y == board.shape[0] - 1:
                 return board
+            
+def num_of_full_rows(board):
+    return np.sum(np.all(board == 1, axis=1))
 
 def find_least_holes(board):
     return np.sum((board == 0) & (np.cumsum(board, axis=0) < np.sum(board, axis=0)))
 
-def find_best_position(board, block_array):
-    best_position = None
-    best_rotation = None
+
+
+def find_best_position(board, block_array, depth):
+    def helper(boards, block, position_rotations_array, num_boards_keep):
+        return_position_rotations_array = None
+        new_boards = []
+        new_position_rotation_array = []
+        score_array = []
+        for index, board in enumerate(boards):
+            for rotation in range(len(block)):
+                positions = get_positions(board, block[rotation])
+                for position in positions:
+                    new_board = place_block(board, block[rotation], position)
+                    # return position if tetris or full clear
+                    if num_of_full_rows(new_board) == 4 or np.all(new_board == 0):
+                        if position_rotations_array is None:
+                            return_position_rotations_array = [position, rotation]
+                        else:
+                            return_position_rotations_array = position_rotations_array[index]
+
+                    # evaluate board score and add to list
+                    score = evaluate_board(new_board)
+                    score_array.append(score)
+                    new_board = clear_full_rows(new_board) # clear after evaluation
+                    new_boards.append(new_board)
+                    if position_rotations_array is None:
+                        new_position_rotation_array.append([position, rotation])
+                    else:
+                        new_position_rotation_array.append(position_rotations_array[index])
+        # get top calculation_accuracy boards and position rotations using their scores
+        top_boards = [x for _, x in sorted(zip(score_array, new_boards), key=lambda pair: pair[0], reverse=True)][:num_boards_keep]
+        top_position_rotations = [x for _, x in sorted(zip(score_array, new_position_rotation_array), key=lambda pair: pair[0], reverse=True)][:num_boards_keep]
+        
+        return top_boards, top_position_rotations, return_position_rotations_array
     board = board.copy()
-    boards = []
-    score_array = []
-    position_rotation_array = []
-    for rotation in range(len(block_array[0])):
-        positions = get_positions(board, block_array[0][rotation])
-        for position in positions:
-            new_board = place_block(board, block_array[0][rotation], position)
-            new_board = clear_full_rows(new_board)
-            # evaluate board score and add to list
-            score = evaluate_board(new_board)
-            score_array.append(score)
-            boards.append(new_board)
-            position_rotation_array.append([position, rotation])
+    top_boards = []
+    top_position_rotations = []
+    # add random ghost pieces from tetris_pieces to block_array
+    if depth > len(block_array):
+        for i in range(depth - len(block_array)):
+            piece = tetris_pieces[list(tetris_pieces.keys())[np.random.randint(len(tetris_pieces))]]
+            block_array.append(piece)
+    for i in range(depth):
+        if i == 0:
+            top_boards, top_position_rotations, return_position_rotations_array = helper([board], block_array[i], None, calculation_accuracy)
+            if return_position_rotations_array is not None:
+                return return_position_rotations_array
+        elif i == depth - 1:
+            top_boards, top_position_rotations, return_position_rotations_array = helper(top_boards, block_array[i], top_position_rotations, 1)
+            if return_position_rotations_array is not None:
+                return return_position_rotations_array
+            return top_position_rotations[0]
+        else:
+            top_boards, top_position_rotations, return_position_rotations_array = helper(top_boards, block_array[i], top_position_rotations, calculation_accuracy)
+            if return_position_rotations_array is not None:
+                return return_position_rotations_array
 
-    # get top calculation_accuracy boards and position rotations using their scores
-    top_boards = [x for _, x in sorted(zip(score_array, boards), key=lambda pair: pair[0], reverse=True)][:calculation_accuracy]
-    top_position_rotations = [x for _, x in sorted(zip(score_array, position_rotation_array), key=lambda pair: pair[0], reverse=True)][:calculation_accuracy]
-    boards2 = []
-    score_array2 = []
-    position_rotation_array2 = []
-    for index, top_board in enumerate(top_boards):
-        for rotation2 in range(len(block_array[1])):
-            positions2 = get_positions(top_board, block_array[1][rotation2])
-            for position2 in positions2:
-                new_board2 = place_block(top_board, block_array[1][rotation2], position2)
-                new_board2 = clear_full_rows(new_board2)
-                # evaluate board score and add to list
-                score = evaluate_board(new_board2)
-                score_array2.append(score)
-                boards2.append(new_board2)
-                position_rotation_array2.append(top_position_rotations[index])
-
-    # get top calculation_accuracy boards and position rotations using their scores
-    top_boards2 = [x for _, x in sorted(zip(score_array2, boards2), key=lambda pair: pair[0], reverse=True)][:calculation_accuracy]
-    top_position_rotations2 = [x for _, x in sorted(zip(score_array2, position_rotation_array2), key=lambda pair: pair[0], reverse=True)][:calculation_accuracy]
-    # boards3 = []
-    score_array3 = []
-    position_rotation_array3 = []
-    for index, top_board2 in enumerate(top_boards2):
-        for rotation3 in range(len(block_array[2])):
-            positions3 = get_positions(top_board2, block_array[2][rotation3])
-            for position3 in positions3:
-                new_board3 = place_block(top_board2, block_array[2][rotation3], position3)
-                # new_board3 = clear_full_rows(new_board3) # either way is the same since the evaluation function takes into account full rows
-                score = evaluate_board(new_board3)
-                score_array3.append(score)
-                # boards3.append(new_board3)
-                position_rotation_array3.append(top_position_rotations2[index])
-                # if score > best_score:
-                #     best_position = position
-                #     best_rotation = rotation
-                #     best_score = score
-    # get top 1 boards using their scores
-    # top_board3s = [x for _, x in sorted(zip(score_array3, boards3), key=lambda pair: pair[0], reverse=True)][:1]
-    top_position_rotations3 = [x for _, x in sorted(zip(score_array3, position_rotation_array3), key=lambda pair: pair[0], reverse=True)][:1]
-    best_position, best_rotation = top_position_rotations3[0]
-
-    return best_position, best_rotation
 
 def place_block(board, rotated_block, position):
     new_board = board.copy()
@@ -279,32 +287,28 @@ board_initialized = False
 piece_array = []
 
 def key_press(best_position, best_rotation):
-    # key presses time
-    start_time4 = time.time()
     # rotate
     if best_rotation == 1:
-        keyboard.press(rotate_clockwise)
-        keyboard.release(rotate_clockwise)
+        keyboard.press(rotate_clockwise_key)
+        keyboard.release(rotate_clockwise_key)
     elif best_rotation == 2:
-        keyboard.press(rotate_180)
-        keyboard.release(rotate_180)
+        keyboard.press(rotate_180_key)
+        keyboard.release(rotate_180_key)
     elif best_rotation == 3:
-        keyboard.press(rotate_counterclockwise)
-        keyboard.release(rotate_counterclockwise)
+        keyboard.press(rotate_counterclockwise_key)
+        keyboard.release(rotate_counterclockwise_key)
     # press left arrow or right arrow to move to position
     if best_position[1] < 3:
         for i in range(3 - best_position[1]):
-            keyboard.press('left')
-            keyboard.release('left')
+            keyboard.press(move_left_key)
+            keyboard.release(move_left_key)
     elif best_position[1] > 3:
         for i in range(best_position[1] - 3):
-            keyboard.press('right')
-            keyboard.release('right')
+            keyboard.press(move_right_key)
+            keyboard.release(move_right_key)
     # press space to drop piece
     keyboard.press('space')
     keyboard.release('space')
-    time.sleep(0.15) # this is needed for some reason, probably can find a better way
-    print("time for key presses: ", time.time() - start_time4)
 
 
 def get_tetris_board_from_screen(top_left_x, top_left_y, bottom_right_x, bottom_right_y):
@@ -312,17 +316,24 @@ def get_tetris_board_from_screen(top_left_x, top_left_y, bottom_right_x, bottom_
     board_image = ImageGrab.grab(board_coords)
     board_image = board_image.convert('L')
     board = np.zeros((20, 10), dtype=int)
-    block_width = board_image.width // 10
-    block_height = board_image.height // 20
+    block_width = board_image.width / 10
+    block_height = board_image.height / 20
 
     for row in reversed(range(20)):
         empty_row = True
         for col in range(10):
-            x = col * block_width + block_width // 2
-            y = row * block_height + block_height // 2
-            # near black
-            print(board_image.getpixel((x, y)))
-            if board_image.getpixel((x, y)) < 20:
+            total_darkness = 0
+            num_pixels = 0
+            for dx in range(-1, 2):
+                for dy in range(-1, 2):
+                    x = math.floor(col * block_width + block_width / 2) + dx
+                    y = math.floor(row * block_height + block_height / 2) + dy
+                    pixel_value = board_image.getpixel((x, y))
+                    total_darkness += pixel_value
+                    num_pixels += 1
+            avg_darkness = total_darkness / num_pixels
+
+            if avg_darkness < 30:
                 board[20 - row - 1][col] = 0
             else:
                 empty_row = False
@@ -340,7 +351,7 @@ while True:
         time.sleep(0.2)
 
     if keyboard.is_pressed(']'):
-        x2, y2 = mouse.get_position()
+        x5, y5 = mouse.get_position()
         time.sleep(0.2)
     
     if keyboard.is_pressed('-'):
@@ -351,49 +362,56 @@ while True:
         x2_board, y2_board = mouse.get_position()
         time.sleep(0.2)
 
-    if x1 != 0 and x2 != 0 and not board_initialized and keyboard.is_pressed('space'):
+    if x1 != 0 and x5 != 0 and not board_initialized and keyboard.is_pressed('space'):
         print('Board initialized')
         board_initialized = True
+        x2, y2 = (x1+x5)//2, y1+math.floor(((y5-y1)/4)*1)
+        x3, y3 = (x1+x5)//2, y1+math.floor(((y5-y1)/4)*2)
+        x4, y4 = (x1+x5)//2, y1+math.floor(((y5-y1)/4)*3)
         closest_color1 = closest_color_in_area(colors, x1, y1)
         closest_color2 = closest_color_in_area(colors, x2, y2)
-        print(f'Closest color: {closest_color1}')
-        print(f'Closest color: {closest_color2}')
+        closest_color3 = closest_color_in_area(colors, x3, y3)
+        closest_color4 = closest_color_in_area(colors, x4, y4)
+        closest_color5 = closest_color_in_area(colors, x5, y5)
         piece_array.append(get_piece_based_on_color(closest_color1, colors))
         piece_array.append(get_piece_based_on_color(closest_color2, colors))
+        piece_array.append(get_piece_based_on_color(closest_color3, colors))
+        piece_array.append(get_piece_based_on_color(closest_color4, colors))
+        piece_array.append(get_piece_based_on_color(closest_color5, colors))
+        print(f'Closest color: {closest_color1}')
+        print(f'Closest color: {closest_color2}')
+        print(f'Closest color: {closest_color3}')
+        print(f'Closest color: {closest_color4}')
+        print(f'Closest color: {closest_color5}')
         first_move = True
         while True:
             # set break key
             if keyboard.is_pressed('esc'):
                 break
-            # if coord at x1, y1 change color, add piece to piece_ar ray
+            # lock until piece changes
             if first_move:
                 closest_color1_0 = closest_color_in_area(colors, x1, y1)
                 closest_color2_0 = closest_color_in_area(colors, x2, y2)
                 if closest_color2 != closest_color2_0 or closest_color1 != closest_color1_0:
                     first_move = False
-                    closest_color1 = closest_color1_0
-                    closest_color2 = closest_color2_0
                 else:
                     continue
-            closest_color2 = closest_color_in_area(colors, x2, y2)
             # total time
             start_time = time.time()
             # time to get color
             start_time3 = time.time()
-            
-            piece_array.append(get_piece_based_on_color(closest_color2, colors))
+            closest_color5 = closest_color_in_area(colors, x5, y5)
+            piece_array.append(get_piece_based_on_color(closest_color5, colors))
             print("time for get color: ", time.time() - start_time)
-            # time to get board
-            start_time2 = time.time()
-            # get board from screen
-            tetrisboard.board = get_tetris_board_from_screen(x1_board, y1_board, x2_board, y2_board)
-            print("time for get board: ", time.time() - start_time2)
-            # print board
-            for row in reversed(tetrisboard.board):
-                print(row)
+            if scan_board:
+                # time to get board
+                start_time2 = time.time()
+                # get board from screen
+                tetrisboard.board = get_tetris_board_from_screen(x1_board, y1_board, x2_board, y2_board)
+                print("time for get board: ", time.time() - start_time2)
             # time how long find_best_position takes
             start_time2 = time.time()
-            best_position, best_rotation = find_best_position(tetrisboard.board, piece_array)
+            best_position, best_rotation = find_best_position(tetrisboard.board, piece_array.copy(), max_depth)
             print("time for find_best_position: ", time.time() - start_time2)
             best_piece_pos_rot = piece_array[0][best_rotation]
             # remove first piece from piece_array
@@ -406,13 +424,17 @@ while True:
                 else:
                     break
             best_position2 = (best_position[0], best_position[1] - offset)
+            # key presses time
+            start_time4 = time.time()
             key_press(best_position2, best_rotation)
+            print("time for key presses: ", time.time() - start_time4)
             # remove 0s padding
             best_piece_pos_rot = best_piece_pos_rot[~np.all(best_piece_pos_rot == 0, axis=1)]
             best_piece_pos_rot = best_piece_pos_rot[:, ~np.all(best_piece_pos_rot == 0, axis=0)]
             tetrisboard.add_piece(best_piece_pos_rot, best_position)
             # clear full rows
             tetrisboard.clear_full_rows()
+            time.sleep(wait_time) # this is needed for some reason (maybe wait for screen to refresh), probably can find a better way
             print("total time: ", time.time() - start_time)
                 
     # Exit the loop with the "ESC" key

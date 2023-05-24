@@ -21,14 +21,6 @@ class TetrisBoard:
         return True
 
     def clear_full_rows(self):
-        # full_rows = []
-        # for y, row in enumerate(self.board):
-        #     if all(cell == 1 for cell in row):
-        #         full_rows.append(y)
-        # for row in full_rows:
-        #     self.board = np.delete(self.board, row, axis=0)
-        #     # insert new row at last index which is the top of the board
-        #     self.board = np.insert(self.board, self.board.shape[0], 0, axis=0)
         while True:
             for y, row in enumerate(self.board):
                 if all(cell == 1 for cell in row):
