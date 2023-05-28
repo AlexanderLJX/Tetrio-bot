@@ -4,32 +4,31 @@ import numpy as np
 import math
 from PIL import ImageGrab
 from TetrisBoard import TetrisBoard
-import pyautogui # somehow the mouse get_position doesn't work
+import pyautogui  # somehow the mouse get_position doesn't work
 
-x1_board, y1_board = 1341,375 # top left of board
-x2_board, y2_board = 1512,715 # bottom right of board
-x1, y1 = 1564,418
+x1_board, y1_board = 1341, 375  # top left of board
+x2_board, y2_board = 1512, 715  # bottom right of board
+x1, y1 = 1564, 418
 x2, y2 = 0, 0
 x3, y3 = 0, 0
 x4, y4 = 0, 0
-x5, y5 = 1565,622
+x5, y5 = 1565, 622
 
-
-pixel_area = 30 # number of pixels to check for color - auto
+pixel_area = 30  # number of pixels to check for color - auto
 
 # keybinds
-rotate_clockwise_key = 'x' # for some reason this is the only key that works - 'up' doesn't work
+rotate_clockwise_key = 'x'  # for some reason this is the only key that works - 'up' doesn't work
 rotate_180_key = 'a'
 rotate_counterclockwise_key = 'z'
 move_left_key = 'left'
 move_right_key = 'right'
 drop_key = 'space'
 # constants - ARR 0ms - DAS 40ms
-calculation_accuracy = 5 # number of best moves to keep at each depth - higher number means more accurate but slower
-max_depth = 6 # number of moves into the future to simulate, max is 6, you can only see 6 blocks at once - higher number means more accurate but slower
-wait_time = 0.04 # time to wait, can't go too low because you need to wait for screen to refresh
-scan_board = True # some modes require scanning the board because of extra pieces - zen, multiplayer
-jstris = False # jstris mode - changes colors
+calculation_accuracy = 5  # number of best moves to keep at each depth - higher number means more accurate but slower
+max_depth = 6  # number of moves into the future to simulate, max is 6, you can only see 6 blocks at once - higher number means more accurate but slower
+wait_time = 0.04  # time to wait, can't go too low because you need to wait for screen to refresh
+scan_board = True  # some modes require scanning the board because of extra pieces - zen, multiplayer
+jstris = False  # jstris mode - changes colors
 
 # Game Settings - DAS 40ms, ARR 0ms
 
@@ -39,11 +38,11 @@ key_delay = 0
 colors = [
     (194, 64, 70),  # red - Z
     (142, 191, 61),  # lime - Z2
-    (93, 76, 176), # dark blue - L2
+    (93, 76, 176),  # dark blue - L2
     (192, 168, 64),  # yellow - O
     (62, 191, 144),  # turquoise - I
-    (194, 115, 68), # orange - L
-    (176, 75, 166), # purple - T
+    (194, 115, 68),  # orange - L
+    (176, 75, 166),  # purple - T
 ]
 
 # jstris settings
@@ -59,20 +58,20 @@ if jstris:
     colors = [
         (215, 15, 55),  # red - Z
         (89, 177, 1),  # lime - Z2
-        (33, 65, 198), # dark blue - L2
+        (33, 65, 198),  # dark blue - L2
         (227, 159, 2),  # yellow - O
         (15, 155, 215),  # turquoise - I
-        (227, 91, 2), # orange - L
-        (175, 41, 138), # purple - T
+        (227, 91, 2),  # orange - L
+        (175, 41, 138),  # purple - T
     ]
 
-    x1_board, y1_board = 1100,228 # top left of board
-    x2_board, y2_board = 1399,827 # bottom right of board
-    x1, y1 = 1475,289
+    x1_board, y1_board = 1100, 228  # top left of board
+    x2_board, y2_board = 1399, 827  # bottom right of board
+    x1, y1 = 1475, 289
     x2, y2 = 0, 0
     x3, y3 = 0, 0
     x4, y4 = 0, 0
-    x5, y5 = 1475,649
+    x5, y5 = 1475, 649
 
 # Each piece is represented by a 2D array, and rotations are stored as a list of 2D arrays
 # 4x4 pieces are padded with 0s to make them 4x4
@@ -149,6 +148,7 @@ def evaluate_board(board):
     score = A * weighted_heights + B * num_cleared_rows * num_cleared_rows * num_cleared_rows + C * holes + D * blockades + E * highest_block_row
     return score
 
+
 def get_positions(board, rotated_block):
     # Return a list of all possible positions for the given block and rotation
     possible_positions = []
@@ -172,6 +172,7 @@ def get_positions(board, rotated_block):
 
     return possible_positions
 
+
 def clear_full_rows(board):
     while True:
         for y, row in enumerate(board):
@@ -182,13 +183,14 @@ def clear_full_rows(board):
                 break
             if y == board.shape[0] - 1:
                 return board
-            
+
+
 def num_of_full_rows(board):
     return np.sum(np.all(board == 1, axis=1))
 
+
 def find_least_holes(board):
     return np.sum((board == 0) & (np.cumsum(board, axis=0) < np.sum(board, axis=0)))
-
 
 
 def find_best_position(board, block_array, depth):
@@ -212,17 +214,21 @@ def find_best_position(board, block_array, depth):
                     # evaluate board score and add to list
                     score = evaluate_board(new_board)
                     score_array.append(score)
-                    new_board = clear_full_rows(new_board) # clear after evaluation
+                    new_board = clear_full_rows(new_board)  # clear after evaluation
                     new_boards.append(new_board)
                     if position_rotations_array is None:
                         new_position_rotation_array.append([position, rotation])
                     else:
                         new_position_rotation_array.append(position_rotations_array[index])
         # get top calculation_accuracy boards and position rotations using their scores
-        top_boards = [x for _, x in sorted(zip(score_array, new_boards), key=lambda pair: pair[0], reverse=True)][:num_boards_keep]
-        top_position_rotations = [x for _, x in sorted(zip(score_array, new_position_rotation_array), key=lambda pair: pair[0], reverse=True)][:num_boards_keep]
-        
+        top_boards = [x for _, x in sorted(zip(score_array, new_boards), key=lambda pair: pair[0], reverse=True)][
+                     :num_boards_keep]
+        top_position_rotations = [x for _, x in
+                                  sorted(zip(score_array, new_position_rotation_array), key=lambda pair: pair[0],
+                                         reverse=True)][:num_boards_keep]
+
         return top_boards, top_position_rotations, return_position_rotations_array
+
     board = board.copy()
     top_boards = []
     top_position_rotations = []
@@ -233,16 +239,20 @@ def find_best_position(board, block_array, depth):
             block_array.append(piece)
     for i in range(depth):
         if i == 0:
-            top_boards, top_position_rotations, return_position_rotations_array = helper([board], block_array[i], None, calculation_accuracy)
+            top_boards, top_position_rotations, return_position_rotations_array = helper([board], block_array[i], None,
+                                                                                         calculation_accuracy)
             if return_position_rotations_array is not None:
                 return return_position_rotations_array
         elif i == depth - 1:
-            top_boards, top_position_rotations, return_position_rotations_array = helper(top_boards, block_array[i], top_position_rotations, 1)
+            top_boards, top_position_rotations, return_position_rotations_array = helper(top_boards, block_array[i],
+                                                                                         top_position_rotations, 1)
             if return_position_rotations_array is not None:
                 return return_position_rotations_array
             return top_position_rotations[0]
         else:
-            top_boards, top_position_rotations, return_position_rotations_array = helper(top_boards, block_array[i], top_position_rotations, calculation_accuracy)
+            top_boards, top_position_rotations, return_position_rotations_array = helper(top_boards, block_array[i],
+                                                                                         top_position_rotations,
+                                                                                         calculation_accuracy)
             if return_position_rotations_array is not None:
                 return return_position_rotations_array
 
@@ -252,11 +262,14 @@ def place_block(board, rotated_block, position):
     # remove padded 0s from rotated block
     rotated_block = rotated_block[~np.all(rotated_block == 0, axis=1)]
     rotated_block = rotated_block[:, ~np.all(rotated_block == 0, axis=0)]
-    new_board[position[0]:position[0] + rotated_block.shape[0], position[1]:position[1] + rotated_block.shape[1]] += rotated_block
+    new_board[position[0]:position[0] + rotated_block.shape[0],
+    position[1]:position[1] + rotated_block.shape[1]] += rotated_block
     return new_board
+
 
 def euclidean_distance(color1, color2):
     return math.sqrt(sum((a - b) ** 2 for a, b in zip(color1, color2)))
+
 
 def closest_color_in_area(colors, x, y):
     min_diff = float('inf')
@@ -268,7 +281,7 @@ def closest_color_in_area(colors, x, y):
         # get pixel colors in a 10 by 10 around x and y
         target_colors = []
         # Grab a portion of the screen
-        half = pixel_area//2
+        half = pixel_area // 2
         full = half * 2
         image = ImageGrab.grab(bbox=(x - half, y - half, x + half, y + half))
         # Loop through the pixels in the grabbed image
@@ -288,6 +301,7 @@ def closest_color_in_area(colors, x, y):
                 if min_diff < 20:
                     break
     return tuple(closest_color)
+
 
 def get_piece_based_on_color(matched_color, colors):
     piece = None
@@ -321,6 +335,7 @@ def get_piece_based_on_color(matched_color, colors):
 tetrisboard = TetrisBoard()
 board_initialized = False
 piece_array = []
+
 
 def key_press(best_position, best_rotation):
     # rotate
@@ -392,7 +407,6 @@ def get_tetris_board_from_screen(top_left_x, top_left_y, bottom_right_x, bottom_
     return board
 
 
-
 # start program
 while True:
     if keyboard.is_pressed('['):
@@ -404,7 +418,7 @@ while True:
         x5, y5 = pyautogui.position()
         print(f"fifth piece: {x5},{y5}")
         time.sleep(0.2)
-    
+
     if keyboard.is_pressed('-'):
         x1_board, y1_board = pyautogui.position()
         print(f"top left: {x1_board},{y1_board}")
@@ -423,11 +437,11 @@ while True:
         print('Board initialized')
         board_initialized = True
         # calculate pixel_area
-        pixel_area = (y5 - y1)//10
+        pixel_area = (y5 - y1) // 10
         print("pixel_area: ", pixel_area)
-        x2, y2 = (x1+x5)//2, y1+math.floor(((y5-y1)/4)*1)
-        x3, y3 = (x1+x5)//2, y1+math.floor(((y5-y1)/4)*2)
-        x4, y4 = (x1+x5)//2, y1+math.floor(((y5-y1)/4)*3)
+        x2, y2 = (x1 + x5) // 2, y1 + math.floor(((y5 - y1) / 4) * 1)
+        x3, y3 = (x1 + x5) // 2, y1 + math.floor(((y5 - y1) / 4) * 2)
+        x4, y4 = (x1 + x5) // 2, y1 + math.floor(((y5 - y1) / 4) * 3)
         closest_color1 = closest_color_in_area(colors, x1, y1)
         closest_color2 = closest_color_in_area(colors, x2, y2)
         closest_color3 = closest_color_in_area(colors, x3, y3)
@@ -500,5 +514,6 @@ while True:
             tetrisboard.add_piece(best_piece_pos_rot, best_position)
             # clear full rows
             tetrisboard.clear_full_rows()
-            time.sleep(wait_time) # this is needed for some reason (maybe wait for screen to refresh), probably can find a better way
+            time.sleep(
+                wait_time)  # this is needed for some reason (maybe wait for screen to refresh), probably can find a better way
             print("total time: ", time.time() - start_time)
