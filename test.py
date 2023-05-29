@@ -4,7 +4,7 @@ import numpy as np
 import math
 from PIL import ImageGrab
 from TetrisBoard import TetrisBoard
-import pyautogui  # somehow the mouse get_position doesn't work
+import pyautogui as pg  # somehow the mouse get_position doesn't work | use pynput or use pg to scan screen for board
 
 x1_board, y1_board = 1341, 375  # top left of board
 x2_board, y2_board = 1512, 715  # bottom right of board
@@ -32,7 +32,7 @@ jstris = False  # jstris mode - changes colors
 
 # Game Settings - DAS 40ms, ARR 0ms
 
-key_delay = 0
+key_delay = 0.1
 
 # Colors for tetrio
 colors = [
@@ -410,22 +410,22 @@ def get_tetris_board_from_screen(top_left_x, top_left_y, bottom_right_x, bottom_
 # start program
 while True:
     if keyboard.is_pressed('['):
-        x1, y1 = pyautogui.position()
+        x1, y1 = pg.position()
         print(f"first piece: {x1},{y1}")
         time.sleep(0.2)
 
     if keyboard.is_pressed(']'):
-        x5, y5 = pyautogui.position()
+        x5, y5 = pg.position()
         print(f"fifth piece: {x5},{y5}")
         time.sleep(0.2)
 
     if keyboard.is_pressed('-'):
-        x1_board, y1_board = pyautogui.position()
+        x1_board, y1_board = pg.position()
         print(f"top left: {x1_board},{y1_board}")
         time.sleep(0.2)
 
     if keyboard.is_pressed('='):
-        x2_board, y2_board = pyautogui.position()
+        x2_board, y2_board = pg.position()
         print(f"bottom right: {x2_board},{y2_board}")
         time.sleep(0.2)
 
