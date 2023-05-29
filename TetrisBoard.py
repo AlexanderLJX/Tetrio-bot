@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class TetrisBoard:
     def __init__(self):
         self.board = np.zeros((20, 10), dtype=int)
@@ -30,4 +31,3 @@ class TetrisBoard:
                     break
                 if y == self.board.shape[0] - 1:
                     return
-        
